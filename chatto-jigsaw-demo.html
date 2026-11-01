@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>ちゃっとジグソー</title>
+<script src="webxdc.js"></script>
+
+<style>
+:root{--bg:#FFFBF5;--card:#FFF;--ink:#2D2A26;--muted:#9B9590;--line:#F0E6DA;--accent:#FF6B35;--shadow:0 10px 30px rgba(45,42,38,0.08),0 2px 8px rgba(45,42,38,0.06);--r-lg:24px;--r-md:16px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Zen Maru Gothic',system-ui,sans-serif}
+body{min-height:100dvh;display:flex;flex-direction:column}
+header{position:sticky;top:0;z-index:20;background:rgba(255,251,245,0.86);border-bottom:1px solid var(--line);padding:14px 20px 12px;display:flex;align-items:center;justify-content:space-between}
+main{flex:1;display:flex;flex-direction:column;max-width:560px;width:100%;margin:0 auto;padding:16px 16px 160px}
+.card{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow);border:1px solid var(--line);overflow:visible}.card-pad{padding:18px}
+.tabs{position:fixed;bottom:0;left:0;right:0;z-index:30;display:flex;justify-content:center;padding:10px 12px calc(10px + env(safe-area-inset-bottom));pointer-events:none}
+.tabs-inner{pointer-events:auto;display:flex;gap:6px;padding:6px;background:rgba(45,42,38,0.92);border-radius:999px}
+.tab-btn{border:0;background:transparent;color:rgba(255,255,255,0.62);padding:10px 16px;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer}.tab-btn.active{background:var(--card);color:var(--ink)}
+.btn{appearance:none;border:0;border-radius:999px;padding:13px 18px;font-weight:700;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+.btn-primary{background:var(--ink);color:white}.btn-accent{background:var(--accent);color:white}.btn-ghost{background:#F8F1E9;color:var(--ink)}.btn:disabled{opacity:.45;pointer-events:none}
+.image-drop{border:2px dashed var(--line);border-radius:var(--r-md);background:#FFFCF8;padding:18px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;cursor:pointer}.image-drop.has-img img.preview{display:block}.image-drop img.preview{width:100%;max-height:240px;object-fit:contain;border-radius:12px;display:none}.image-drop.has-img .drop-hint{display:none}
+.row{display:flex;gap:10px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.pill{padding:8px 12px;border-radius:999px;background:#F8F1E9;border:1px solid var(--line);font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.range-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.range-head span{font-size:12px;color:var(--muted);background:#F8F1E9;padding:4px 10px;border-radius:999px}input[type=range]{width:100%;accent-color:var(--accent);height:28px}
+.preset-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}.preset{border:1px solid var(--line);background:white;border-radius:12px;padding:10px 6px;text-align:center;font-size:12px;font-weight:700;cursor:pointer}.preset.active{background:var(--ink);color:white}
+.board-area{position:relative;width:100%;background:#F8F1E9;border-radius:var(--r-md);border:1px solid var(--line);overflow:visible}
+#playField{position:relative;width:100%;touch-action:pan-y;user-select:none;display:flex;flex-direction:column}
+#boardContainer{position:relative;display:flex;justify-content:center;padding:14px 8px}
+#boardVisual{position:relative;border-radius:14px;overflow:hidden;background:white;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.06),0 2px 12px rgba(0,0,0,0.08);flex-shrink:0}
+#boardVisual img{width:100%;height:100%;object-fit:cover;opacity:0.22;display:block}
+#boardGrid{position:absolute;inset:0;background-image:linear-gradient(rgba(0,0,0,0.06) 1px, transparent 1px),linear-gradient(90deg, rgba(0,0,0,0.06) 1px, transparent 1px);pointer-events:none}
+#trayWrap{position:relative;width:100%;min-height:220px;background:repeating-linear-gradient(45deg,#FFF8EE,#FFF8EE 10px,#FFFBF5 10px,#FFFBF5 20px);border-top:2px dashed var(--line);border-radius:0 0 var(--r-md) var(--r-md);padding:32px 8px 20px}
+.tray-header{position:absolute;top:-14px;left:12px;display:flex;gap:8px;align-items:center;font-size:11px;font-weight:700;color:var(--muted);background:var(--bg);padding:5px 12px;border-radius:999px;border:1px solid var(--line);z-index:2}
+#piecesLayer{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:5}
+.piece{position:absolute;cursor:grab;touch-action:none;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.18));transition:filter .15s,transform .08s;will-change:left,top;pointer-events:auto}
+.piece canvas{width:100%;height:100%;display:block}.piece.dragging{z-index:9999!important;filter:drop-shadow(0 12px 24px rgba(0,0,0,0.28));transform:scale(1.05) rotate(1deg)}
+.piece.placed{filter:drop-shadow(0 1px 2px rgba(0,0,0,0.08));cursor:default}
+.hud{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.hud-item{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:7px 12px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px}
+.gallery{display:grid;grid-template-columns:1fr;gap:12px}.g-card{border-radius:18px;background:white;border:1px solid var(--line);padding:12px;display:flex;gap:12px}.g-thumb{width:86px;height:86px;border-radius:12px;object-fit:cover;border:1px solid var(--line)}.g-actions{display:flex;gap:6px;margin-top:8px}.mini-btn{border:0;background:#F8F1E9;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer}
+.preview-float{pointer-events:none;position:absolute;top:8px;right:8px;width:92px;height:68px;border-radius:10px;overflow:hidden;border:2px solid white;box-shadow:0 6px 16px rgba(0,0,0,0.18);z-index:20;cursor:pointer}.preview-float.hidden{opacity:0;pointer-events:none}.preview-float img{width:100%;height:100%;object-fit:cover}
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:100;overflow:hidden}.confetti i{position:absolute;width:8px;height:14px;border-radius:3px;animation:fall 1.2s linear forwards}@keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+.empty{padding:36px 20px;text-align:center;color:var(--muted)}.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:white;padding:10px 16px;border-radius:999px;font-size:12px;font-weight:700;opacity:0;transition:.28s;z-index:80}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}.hidden{display:none!important}
+#trayWrap{min-height:0;padding:12px 10px 14px;overflow:visible}.tray-toolbar{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;font-size:12px}.tray-pages{display:flex;align-items:center;gap:7px}#trayPageLabel{font-size:12px;min-width:44px;text-align:center}.mini-btn:disabled{opacity:.35;cursor:default}#trayHelp{font-size:11px;color:#71695f;line-height:1.5;min-height:33px;margin:8px 0}#traySlots{display:grid;gap:8px;grid-template-columns:repeat(3,1fr)}.tray-slot{height:76px;background:rgba(255,255,255,.7);border:1px solid #e9ddcd;border-radius:12px}.empty-slot{opacity:.3}.piece.tray-thumb{filter:drop-shadow(0 2px 3px rgba(0,0,0,.12));cursor:pointer}.piece.selected{outline:3px solid var(--accent);outline-offset:2px;border-radius:7px}.piece:focus-visible{outline:3px solid #167da1}.piece.dragging{transform:none}.piece.placed{pointer-events:none}
+</style>
+</head>
+<body>
+<header><div style="display:flex;align-items:center;gap:10px"><div style="width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,#FF6B35,#FF9A6B);display:grid;place-items:center;color:white;font-weight:800">ジ</div><div><b>ちゃっとジグソー</b><div style="font-size:11px;color:#9B9590">協力モード 1.2.0</div></div></div><div class="pill"><span style="width:8px;height:8px;border-radius:50%;background:#4ECDC4;display:inline-block"></span><span id="connText">同期準備中</span></div></header>
+<main>
+<section id="view-play"><div class="card"><div class="card-pad" style="padding-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div><div style="font-weight:800">あそぶ</div><div style="font-size:11px;color:#9B9590">固定したピースをみんなで共有</div></div><div class="row"><button class="mini-btn" id="btnPreviewToggle">👁 プレビュー</button><button class="mini-btn" id="btnShuffle">🔀 シャッフル</button><button class="mini-btn" id="btnOrganize">🗂 整理</button></div></div><div class="hud"><div class="hud-item" title="自分のプレイ時間">⏱ 自分 <b id="hudTime">00:00</b></div><div class="hud-item" title="自分の操作回数">✋ 自分 <b id="hudMoves">0</b></div><div class="hud-item">🧩 <b id="hudPieces">0</b></div><div class="hud-item">💡 チーム <b id="hudHints">0</b></div><div class="hud-item hidden" id="hudProgress">✅ <b id="hudProgressText">0/0</b></div></div></div><div style="padding:0 10px 10px"><div class="board-area" id="boardArea"><div id="playField"><div id="boardContainer"><div id="boardVisual"><img id="boardVisualImg" alt=""><div id="boardGrid"></div><div class="preview-float hidden" id="previewFloat"><img id="previewFloatImg"></div></div></div><div id="trayWrap"><div class="tray-toolbar"><b>🧩 置き場 <span id="trayCount">0</span>枚</b><div class="tray-pages"><button class="mini-btn" id="btnTrayPrev" aria-label="前のページ">◀ 前へ</button><span id="trayPageLabel" aria-live="polite">1 / 1</span><button class="mini-btn" id="btnTrayNext" aria-label="次のページ">次へ ▶</button></div></div><p id="trayHelp" aria-live="polite">ピースをタップ → ボードをタップ。ドラッグでも移動できます。</p><div id="traySlots"></div></div><div id="piecesLayer"></div></div><div id="boardEmpty" class="empty" style="position:absolute;inset:0;display:grid;place-items:center;background:rgba(248,241,233,0.92);z-index:10;border-radius:16px"><div><div style="font-size:36px">🧩</div><div style="font-weight:700">まだパズルがないよ</div><button class="btn btn-primary" style="margin-top:12px" onclick="switchTab('create')">つくるへ行く</button></div></div></div></div></div><div class="card" style="margin-top:14px"><div class="card-pad"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><button class="btn btn-ghost" id="btnHint">💡 ヒント</button><button class="btn btn-ghost" id="btnToTray">↩ 置き場に戻す</button><button class="btn btn-accent" id="btnCompleteShare">🎉 完成をシェア</button></div></div></div></section>
+<section id="view-create" class="hidden"><div class="card"><div class="card-pad"><div style="font-weight:800">パズルをつくる</div><div style="font-size:12px;color:#9B9590">カメラやファイルから取り込み</div><div style="margin-top:16px" class="grid2"><label class="btn btn-primary" style="cursor:pointer"><input id="inputCamera" type="file" accept="image/*" capture="environment" hidden>📷 カメラ</label><label class="btn btn-ghost" style="cursor:pointer"><input id="inputFile" type="file" accept="image/*" hidden>🖼️ ファイル</label></div><div id="dropArea" class="image-drop" style="margin-top:14px"><img id="createPreview" class="preview"><div class="drop-hint"><div style="font-size:32px">🎨</div><div style="font-weight:700">ドラッグ&ドロップ</div></div><div id="createPreviewMeta" class="hidden" style="font-size:11px;color:#9B9590"></div></div><div style="margin-top:18px"><div class="range-head"><b>タテ</b><span id="rowsLabel">5</span></div><input type="range" id="rowsRange" min="2" max="10" value="5"><div class="range-head" style="margin-top:8px"><b>ヨコ</b><span id="colsLabel">5</span></div><input type="range" id="colsRange" min="2" max="10" value="5"><div class="preset-grid" id="presetGrid"><button class="preset" data-r="3" data-c="3">3×3</button><button class="preset active" data-r="5" data-c="5">5×5</button><button class="preset" data-r="6" data-c="6">6×6</button><button class="preset" data-r="8" data-c="8">8×8</button></div><div style="margin-top:12px" class="pill">🧩 合計 <b id="totalPieces">25</b> ピース</div></div><div style="margin-top:18px" class="row"><button id="btnCreatePuzzle" class="btn btn-accent" style="flex:1" disabled>✨ 作成 & 配信</button></div></div></div></section>
+<section id="view-gallery" class="hidden"><div class="card"><div class="card-pad"><div style="display:flex;justify-content:space-between"><div><div style="font-weight:800">みんなのパズル</div><div style="font-size:11px;color:#9B9590">配信されたパズル</div></div><div class="row"><button class="mini-btn" id="btnRestoreGallery">非表示を戻す</button><button class="mini-btn" id="btnClearGallery">一覧をクリア</button></div></div><div id="galleryList" class="gallery" style="margin-top:14px"></div><div id="galleryEmpty" class="empty"><div style="font-size:28px">📭</div><div>まだないよ</div></div></div></div><div class="card" style="margin-top:14px"><div class="card-pad"><div style="font-weight:700;font-size:13px">完成ログ</div><div id="completeLog" style="margin-top:10px;display:flex;flex-direction:column;gap:8px"></div><div id="completeEmpty" style="font-size:11px;color:#9B9590">まだ誰も完成していません</div></div></div></section>
+</main>
+<div class="tabs"><div class="tabs-inner"><button class="tab-btn active" data-tab="play">あそぶ</button><button class="tab-btn" data-tab="create">つくる</button><button class="tab-btn" data-tab="gallery">みんな</button></div></div>
+<div id="toast" class="toast"></div><div id="confetti" class="confetti hidden"></div>
+<script>
+const isWebxdc=!!window.webxdc;
+if(!isWebxdc){window.webxdc={selfAddr:'local@example.com',selfName:'あなた',sendUpdate:(p,i)=>{handleUpdate({payload:p.payload})},setUpdateListener:(cb)=>{}};document.getElementById('connText').textContent='ブラウザテスト中';}
+let appState={image:null,imageDataUrl:null,rows:5,cols:5,currentPuzzleId:null,puzzles:[],completes:[],pieces:[],timer:0,timerInt:null,moves:0,boardW:0,boardH:0,pieceW:0,pieceH:0,tabSize:0,boardLeft:0,boardTop:0,trayTop:0,trayH:0};
+const LS_KEY='chatto-jigsaw-v4-fix3';
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2400);}
+function switchTab(n){document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===n));document.getElementById('view-play').classList.toggle('hidden',n!=='play');document.getElementById('view-create').classList.toggle('hidden',n!=='create');document.getElementById('view-gallery').classList.toggle('hidden',n!=='gallery');if(n==='play')requestAnimationFrame(resizePuzzle);}
+document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
+function compressImage(f,maxSide=900,q=0.78){return new Promise((r,reject)=>{const img=new Image();img.onerror=()=>reject(new Error('画像を読み込めません'));img.onload=()=>{let w=img.naturalWidth,h=img.naturalHeight;const s=Math.min(1,maxSide/Math.max(w,h));w=Math.round(w*s);h=Math.round(h*s);const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);r(cv.toDataURL('image/jpeg',q));};if(typeof f==='string')img.src=f;else{const rd=new FileReader();rd.onerror=()=>reject(new Error('ファイルを読み込めません'));rd.onload=()=>{img.src=rd.result};rd.readAsDataURL(f);}});}
+function loadImageElement(u){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=u;});}
+const dropArea=document.getElementById('dropArea'),createPreview=document.getElementById('createPreview'),createPreviewMeta=document.getElementById('createPreviewMeta');
+let imageRequest=0;
+async function setCreateImage(f){const request=++imageRequest;document.getElementById('btnCreatePuzzle').disabled=true;try{let c=await compressImage(f,900,0.78);const limit=Number(window.webxdc.sendUpdateMaxSize)||128000;let side=900;while(c.length>limit-4096&&side>32){side=Math.floor(side*.8);c=await compressImage(c,side,.65);}if(c.length>limit-4096)throw new Error('画像が大きすぎます');const el=await loadImageElement(c);if(request!==imageRequest)return;appState.imageDataUrl=c;appState.image=el;createPreview.src=c;dropArea.classList.add('has-img');createPreviewMeta.classList.remove('hidden');createPreviewMeta.textContent=`${el.naturalWidth}x${el.naturalHeight} ${Math.round(c.length/1024)}KB`;document.getElementById('btnCreatePuzzle').disabled=false;}catch(e){if(request===imageRequest){appState.imageDataUrl=null;toast('画像を読み込めません。別の画像を選んでください');}}}
+document.getElementById('inputFile').addEventListener('change',e=>{const f=e.target.files[0];if(f)setCreateImage(f);});
+document.getElementById('inputCamera').addEventListener('change',e=>{const f=e.target.files[0];if(f)setCreateImage(f);});
+dropArea.addEventListener('dragover',e=>{e.preventDefault();});dropArea.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/'))setCreateImage(f);});
+dropArea.addEventListener('click',()=>{if(!dropArea.classList.contains('has-img'))document.getElementById('inputFile').click();});
+const rowsRange=document.getElementById('rowsRange'),colsRange=document.getElementById('colsRange'),rowsLabel=document.getElementById('rowsLabel'),colsLabel=document.getElementById('colsLabel'),totalPieces=document.getElementById('totalPieces');
+function updateCounts(){appState.rows=parseInt(rowsRange.value);appState.cols=parseInt(colsRange.value);rowsLabel.textContent=appState.rows;colsLabel.textContent=appState.cols;totalPieces.textContent=appState.rows*appState.cols;document.querySelectorAll('.preset').forEach(p=>{const r=parseInt(p.dataset.r),c=parseInt(p.dataset.c);p.classList.toggle('active',r===appState.rows&&c===appState.cols);});}
+rowsRange.addEventListener('input',updateCounts);colsRange.addEventListener('input',updateCounts);
+document.getElementById('presetGrid').addEventListener('click',e=>{const b=e.target.closest('.preset');if(!b)return;rowsRange.value=b.dataset.r;colsRange.value=b.dataset.c;updateCounts();});updateCounts();
+function randTab(){return Math.random()<0.5?-1:1;}
+function drawJigsawPath(ctx,x,y,w,h,tabSize,top,right,bottom,left){
+  const tabW=Math.min(w,h)*0.34, bulbW=tabW*1.6, bulbH=tabSize*0.92, neckH=tabSize*0.33;
+  ctx.beginPath();ctx.moveTo(x,y);
+  if(top===0){ctx.lineTo(x+w,y);}else{
+    const midX=x+w*0.5,dir=top;
+    ctx.lineTo(midX-tabW*0.5,y);
+    ctx.bezierCurveTo(midX-tabW*0.5,y+dir*neckH*0.6,midX-tabW*0.45,y+dir*neckH,midX-bulbW*0.5,y+dir*neckH);
+    ctx.bezierCurveTo(midX-bulbW*0.5,y+dir*(neckH+bulbH*0.25),midX-bulbW*0.35,y+dir*(neckH+bulbH),midX,y+dir*(neckH+bulbH));
+    ctx.bezierCurveTo(midX+bulbW*0.35,y+dir*(neckH+bulbH),midX+bulbW*0.5,y+dir*(neckH+bulbH*0.25),midX+bulbW*0.5,y+dir*neckH);
+    ctx.bezierCurveTo(midX+tabW*0.45,y+dir*neckH,midX+tabW*0.5,y+dir*neckH*0.6,midX+tabW*0.5,y);
+    ctx.lineTo(x+w,y);
+  }
+  if(right===0){ctx.lineTo(x+w,y+h);}else{
+    const midY=y+h*0.5,dir=right;
+    ctx.lineTo(x+w,midY-tabW*0.5);
+    ctx.bezierCurveTo(x+w+dir*neckH*0.6,midY-tabW*0.5,x+w+dir*neckH,midY-tabW*0.45,x+w+dir*neckH,midY-bulbW*0.5);
+    ctx.bezierCurveTo(x+w+dir*(neckH+bulbH*0.25),midY-bulbW*0.5,x+w+dir*(neckH+bulbH),midY-bulbW*0.35,x+w+dir*(neckH+bulbH),midY);
+    ctx.bezierCurveTo(x+w+dir*(neckH+bulbH),midY+bulbW*0.35,x+w+dir*(neckH+bulbH*0.25),midY+bulbW*0.5,x+w+dir*neckH,midY+bulbW*0.5);
+    ctx.bezierCurveTo(x+w+dir*neckH,midY+tabW*0.45,x+w+dir*neckH*0.6,midY+tabW*0.5,x+w,midY+tabW*0.5);
+    ctx.lineTo(x+w,y+h);
+  }
+  if(bottom===0){ctx.lineTo(x,y+h);}else{
+    const midX=x+w*0.5,dir=bottom;
+    ctx.lineTo(midX+tabW*0.5,y+h);
+    ctx.bezierCurveTo(midX+tabW*0.5,y+h+dir*neckH*0.6,midX+tabW*0.45,y+h+dir*neckH,midX+bulbW*0.5,y+h+dir*neckH);
+    ctx.bezierCurveTo(midX+bulbW*0.5,y+h+dir*(neckH+bulbH*0.25),midX+bulbW*0.35,y+h+dir*(neckH+bulbH),midX,y+h+dir*(neckH+bulbH));
+    ctx.bezierCurveTo(midX-bulbW*0.35,y+h+dir*(neckH+bulbH),midX-bulbW*0.5,y+h+dir*(neckH+bulbH*0.25),midX-bulbW*0.5,y+h+dir*neckH);
+    ctx.bezierCurveTo(midX-tabW*0.45,y+h+dir*neckH,midX-tabW*0.5,y+h+dir*neckH*0.6,midX-tabW*0.5,y+h);
+    ctx.lineTo(x,y+h);
+  }
+  if(left===0){ctx.lineTo(x,y);}else{
+    const midY=y+h*0.5,dir=left;
+    ctx.lineTo(x,midY+tabW*0.5);
+    ctx.bezierCurveTo(x+dir*neckH*0.6,midY+tabW*0.5,x+dir*neckH,midY+tabW*0.45,x+dir*neckH,midY+bulbW*0.5);
+    ctx.bezierCurveTo(x+dir*(neckH+bulbH*0.25),midY+bulbW*0.5,x+dir*(neckH+bulbH),midY+bulbW*0.35,x+dir*(neckH+bulbH),midY);
+    ctx.bezierCurveTo(x+dir*(neckH+bulbH),midY-bulbW*0.35,x+dir*(neckH+bulbH*0.25),midY-bulbW*0.5,x+dir*neckH,midY-bulbW*0.5);
+    ctx.bezierCurveTo(x+dir*neckH,midY-tabW*0.45,x+dir*neckH*0.6,midY-tabW*0.5,x,midY-tabW*0.5);
+    ctx.lineTo(x,y);
+  }
+  ctx.closePath();
+}
+let buildVersion=0,dragCleanup=()=>{};
+async function buildPuzzle(def){
+  captureProgress();const version=++buildVersion;appState.building=true;stopTimer();dragCleanup();switchTab('play');
+  const boardArea=document.getElementById('boardArea');
+  const playField=document.getElementById('playField');
+  const piecesLayer=document.getElementById('piecesLayer');
+  const boardVisual=document.getElementById('boardVisual');
+  const boardVisualImg=document.getElementById('boardVisualImg');
+  const trayWrap=document.getElementById('trayWrap');
+  document.getElementById('boardEmpty').style.display='none';
+  const wrapW=boardArea.getBoundingClientRect().width;
+  const img=await loadImageElement(def.imageDataUrl);
+  if(version!==buildVersion)return;
+  piecesLayer.innerHTML='';appState.currentPuzzleId=def.id;appState.activeDefinition=def;appState.playRows=def.rows;appState.playCols=def.cols;appState.completedResult=null;
+  let boardW=Math.min(wrapW*0.88,480), boardH=boardW/(img.naturalWidth/img.naturalHeight);
+  if(boardH>wrapW*0.95){boardH=wrapW*0.95;boardW=boardH*(img.naturalWidth/img.naturalHeight);}
+  boardVisual.style.width=boardW+'px';boardVisual.style.height=boardH+'px';
+  boardVisualImg.src=def.imageDataUrl;
+  document.getElementById('previewFloatImg').src=def.imageDataUrl;
+  document.getElementById('previewFloat').classList.remove('hidden');
+  const rows=def.rows,cols=def.cols,pieceW=boardW/cols,pieceH=boardH/rows,tabSize=Math.min(pieceW,pieceH)*0.30;
+  appState.boardW=boardW;appState.boardH=boardH;appState.pieceW=pieceW;appState.pieceH=pieceH;appState.tabSize=tabSize;document.getElementById('boardGrid').style.backgroundSize=pieceW+'px '+pieceH+'px';
+  const nextTab=tabGenerator(def.id);
+  const hTabs=Array.from({length:rows-1},()=>Array.from({length:cols},()=>nextTab()));
+  const vTabs=Array.from({length:rows},()=>Array.from({length:cols-1},()=>nextTab()));
+  appState.pieces=[];
+  const boardCanvas=document.createElement('canvas');boardCanvas.width=boardW;boardCanvas.height=boardH;boardCanvas.getContext('2d').drawImage(img,0,0,boardW,boardH);
+  await new Promise(resolve=>requestAnimationFrame(()=>{
+    if(version!==buildVersion){resolve();return;}
+    const playRect=playField.getBoundingClientRect();
+    const boardRect=boardVisual.getBoundingClientRect();
+    const boardLeft=boardRect.left - playRect.left;
+    const boardTop=boardRect.top - playRect.top;
+    appState.boardLeft=boardLeft;appState.boardTop=boardTop;
+    const trayRect=trayWrap.getBoundingClientRect();
+    appState.trayTop=trayRect.top - playRect.top;
+    appState.trayH=trayRect.height;
+    const frag=document.createDocumentFragment();
+    for(let r=0;r<rows;r++){for(let c=0;c<cols;c++){
+      const top=r===0?0:hTabs[r-1][c],bottom=r===rows-1?0:hTabs[r][c],left=c===0?0:vTabs[r][c-1],right=c===cols-1?0:vTabs[r][c];
+      const cw=Math.ceil(pieceW+tabSize*2.5+10),ch=Math.ceil(pieceH+tabSize*2.5+10);
+      const cv=document.createElement('canvas');cv.width=cw;cv.height=ch;const ctx=cv.getContext('2d');ctx.clearRect(0,0,cw,ch);const off=tabSize*1.25+5;
+      drawJigsawPath(ctx,off,off,pieceW,pieceH,tabSize,top,right,bottom,left);ctx.save();ctx.clip();ctx.drawImage(boardCanvas,off-c*pieceW,off-r*pieceH);ctx.restore();
+      ctx.strokeStyle='rgba(45,42,38,0.16)';ctx.lineWidth=1.1;drawJigsawPath(ctx,off,off,pieceW,pieceH,tabSize,top,right,bottom,left);ctx.stroke();
+      const wrap=document.createElement('div');wrap.className='piece';wrap.style.width=cw+'px';wrap.style.height=ch+'px';wrap.appendChild(cv);wrap.setAttribute('role','button');wrap.tabIndex=0;wrap.setAttribute('aria-pressed','false');wrap.setAttribute('aria-label','ピース '+(r*cols+c+1));
+      const correctX=boardLeft + c*pieceW - off;
+      const correctY=boardTop + r*pieceH - off;
+      wrap.dataset.correctX=correctX;wrap.dataset.correctY=correctY;wrap.dataset.r=r;wrap.dataset.c=c;
+      const idx=r*cols+c;
+      const trayCols=Math.max(1,Math.floor(wrapW/(cw+10)));
+      const tc=idx % trayCols;
+      const tr=Math.floor(idx / trayCols);
+      const baseX=10 + tc*(cw+10);
+      const baseY=appState.trayTop + 32 + tr*(ch+10);
+      wrap.style.left=baseX+'px';wrap.style.top=baseY+'px';wrap.style.zIndex=10+idx;
+      frag.appendChild(wrap);appState.pieces.push({el:wrap,r,c,correctX,correctY,placed:false,inTray:true,fullW:cw,fullH:ch});
+    }}
+    piecesLayer.appendChild(frag);
+    document.getElementById('hudPieces').textContent=rows*cols;
+    document.getElementById('hudProgress').classList.remove('hidden');
+    updateProgress();attachDrag();appState.building=false;restoreProgress(def);
+    layoutTray();captureProgress();resolve();
+  }));
+}
+function resizePuzzle(){
+ if(!appState.pieces.length||document.getElementById('view-play').classList.contains('hidden'))return;
+ const pf=document.getElementById('playField'),bv=document.getElementById('boardVisual');
+ const w=document.getElementById('boardArea').getBoundingClientRect().width,aspect=appState.boardW/appState.boardH;
+ let nw=Math.min(w*.88,480),nh=nw/aspect;if(nh>w*.95){nh=w*.95;nw=nh*aspect;}
+ const scale=nw/appState.boardW;if(Math.abs(scale-1)<.001){layoutTray();return;}
+ dragCleanup();const oldLeft=appState.boardLeft,oldTop=appState.boardTop,oldTray=appState.trayTop;
+ bv.style.width=nw+'px';bv.style.height=nh+'px';const pr=pf.getBoundingClientRect(),br=bv.getBoundingClientRect();
+ appState.boardLeft=br.left-pr.left;appState.boardTop=br.top-pr.top;appState.trayTop=document.getElementById('trayWrap').getBoundingClientRect().top-pr.top;
+ appState.pieces.forEach(p=>{p.fullW*=scale;p.fullH*=scale;const el=p.el,x=parseFloat(el.style.left),y=parseFloat(el.style.top);p.correctX=appState.boardLeft+(p.correctX-oldLeft)*scale;p.correctY=appState.boardTop+(p.correctY-oldTop)*scale;el.dataset.correctX=p.correctX;el.dataset.correctY=p.correctY;el.style.width=parseFloat(el.style.width)*scale+'px';el.style.height=parseFloat(el.style.height)*scale+'px';el.style.left=(p.placed?p.correctX:Math.max(0,Math.min(w-el.offsetWidth,x*scale)))+'px';el.style.top=(p.placed?p.correctY:y>=oldTray?appState.trayTop+(y-oldTray)*scale:appState.boardTop+(y-oldTop)*scale)+'px';});
+ appState.boardW=nw;appState.boardH=nh;appState.pieceW*=scale;appState.pieceH*=scale;appState.tabSize*=scale;document.getElementById('boardGrid').style.backgroundSize=appState.pieceW+'px '+appState.pieceH+'px';
+ layoutTray();attachDrag();captureProgress();
+}
+window.addEventListener('resize',resizePuzzle);
+function updateProgress(){const placed=appState.pieces.filter(p=>p.placed).length;document.getElementById('hudProgressText').textContent=`${placed}/${appState.pieces.length}`;updateTrayCount();}
+function updateTrayCount(){const inTray=appState.pieces.filter(p=>!p.placed).length;const el=document.getElementById('trayCount');if(el)el.textContent=inTray;layoutTray();}
+function stopTimer(){if(appState.timerInt){clearInterval(appState.timerInt);appState.timerInt=null;}}
+function launchConfetti(){const c=document.getElementById('confetti');c.classList.remove('hidden');c.innerHTML='';const cols=['#FF6B35','#4ECDC4','#FFD93D','#6C5CE7','#00B894'];for(let i=0;i<70;i++){const el=document.createElement('i');el.style.left=Math.random()*100+'vw';el.style.top='-10vh';el.style.background=cols[i%cols.length];el.style.animationDelay=Math.random()*0.4+'s';c.appendChild(el);}setTimeout(()=>c.classList.add('hidden'),2200);}
+document.getElementById('btnShuffle').addEventListener('click',()=>{arrangeTray(true);toast('置き場の順番をシャッフルしました');});
+document.getElementById('btnOrganize').addEventListener('click',()=>{arrangeTray(false);toast('未固定ピースを置き場へ整理しました');});
+document.getElementById('btnPreviewToggle').addEventListener('click',()=>{const pf=document.getElementById('previewFloat');if(pf)pf.classList.toggle('hidden');});
+document.getElementById('previewFloat').addEventListener('click',()=>{document.getElementById('previewFloat').classList.add('hidden');});
+document.getElementById('btnToTray').addEventListener('click',()=>returnBoardPieces());
+document.getElementById('btnHint').addEventListener('click',()=>{const u=appState.pieces.filter(p=>!p.placed);if(!u.length)return;const edges=u.filter(p=>p.r===0||p.c===0||p.r===appState.playRows-1||p.c===appState.playCols-1);const pick=(edges.length?edges:u)[Math.floor(Math.random()*(edges.length?edges.length:u.length))];lockPiece(appState.pieces.indexOf(pick),true);});
+document.getElementById('btnCompleteShare').addEventListener('click',()=>{if(!appState.completedResult||!appState.pieces.length||!appState.pieces.every(p=>p.placed)){toast('パズルを完成させてからシェアしてください');return;}publishResult(appState.completedResult);});
+
+document.getElementById('btnCreatePuzzle').addEventListener('click',async()=>{captureProgress();const id=newPuzzleId();if(!appState.imageDataUrl)return;const def={id,rows:appState.rows,cols:appState.cols,imageDataUrl:appState.imageDataUrl,creator:window.webxdc.selfName||'あなた',creatorAddr:window.webxdc.selfAddr,ts:Date.now()};appState.puzzles.unshift(def);saveLocal();renderGallery();if(isWebxdc)publishPuzzle(def);switchTab('play');await buildPuzzle(def);});
+function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function validPuzzle(p){return typeof p.id==='string'&&Number.isInteger(p.rows)&&p.rows>=2&&p.rows<=10&&Number.isInteger(p.cols)&&p.cols>=2&&p.cols<=10&&typeof p.imageDataUrl==='string'&&/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(p.imageDataUrl);}
+</script>
+<script>
+// Cooperative logic is embedded so index.html works on its own.
+/* Cooperative state is a grow-only set of fixed indices and unique hint uses.
+ * Single lock: ["p", puzzleId, index, hintTokenOr0]. No coordinates/images.
+ * Multiple locks: ["b", puzzleId, [[index, hintTokenOr0], ...]].
+ * Replays, duplicate deliveries and concurrent fixes commute. */
+'use strict';
+var saveLocal,loadLocal,startTimer,recordComplete,checkComplete,publishResult,publishPuzzle,renderGallery,renderCompletes,handleUpdate;
+const COOP_KEY='chatto-jigsaw-coop-v1';
+Object.assign(appState,{shared:{},progress:{},hiddenPuzzles:{},hiddenResults:{},distributed:{},outbox:[],lastPuzzleId:null,building:false,storageError:false});
+let sending=false,sendTimer=null,lastSend=0,inFlight=new Set(),replaying=true;
+const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
+const validId=id=>typeof id==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(id);
+const map=()=>Object.create(null);
+function token(){const bytes=new Uint8Array(9);crypto.getRandomValues(bytes);return btoa(String.fromCharCode(...bytes)).replaceAll('+','-').replaceAll('/','_');}
+function newPuzzleId(){return 'p-'+token();}
+function tabGenerator(id){let seed=2166136261;for(const c of id)seed=Math.imul(seed^c.charCodeAt(0),16777619);return ()=>{seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return (seed>>>0)%2?-1:1;};}
+function syncStatus(){const el=document.getElementById('connText');el.textContent=appState.storageError?'保存失敗':!isWebxdc?'ブラウザ単体':appState.outbox.length?'同期待ち '+appState.outbox.length:'協力モード';}
+saveLocal=function(){try{localStorage.setItem(COOP_KEY,JSON.stringify({version:1,puzzles:appState.puzzles,completes:appState.completes,shared:appState.shared,progress:appState.progress,hiddenPuzzles:appState.hiddenPuzzles,hiddenResults:appState.hiddenResults,distributed:appState.distributed,outbox:appState.outbox,lastPuzzleId:appState.lastPuzzleId}));appState.storageError=false;}catch(e){if(!appState.storageError)toast('端末に保存できません。容量や保存設定を確認してください');appState.storageError=true;}syncStatus();};
+loadLocal=function(){try{const raw=localStorage.getItem(COOP_KEY);const d=JSON.parse(raw||localStorage.getItem(LS_KEY)||'{}');if(Array.isArray(d.puzzles))appState.puzzles=d.puzzles.filter(p=>validPuzzle(p)&&validId(p.id));if(Array.isArray(d.completes))appState.completes=d.completes.filter(validResult);for(const key of ['shared','progress','hiddenPuzzles','hiddenResults','distributed']){appState[key]=Object.assign(map(),d[key]&&typeof d[key]==='object'&&!Array.isArray(d[key])?d[key]:{});}appState.outbox=Array.isArray(d.outbox)?d.outbox.filter(x=>x&&typeof x.key==='string'&&x.update&&x.update.payload):[];appState.lastPuzzleId=validId(d.lastPuzzleId)?d.lastPuzzleId:null;}catch(e){toast('保存データを読み込めません。通信履歴から復元します');}};
+function stateFor(id){if(!own(appState.shared,id)||!appState.shared[id]||!Array.isArray(appState.shared[id].fixed))appState.shared[id]={fixed:[],hints:map()};const st=appState.shared[id];if(!st.hints||typeof st.hints!=='object')st.hints=map();return st;}
+function hintCount(id){return Object.keys(stateFor(id).hints).length;}
+function placementKey(id,i,h){return 'p:'+id+':'+i+':'+h;}
+function enqueue(key,update){if(!appState.outbox.some(x=>x.key===key))appState.outbox.push({key,update});saveLocal();scheduleSend();}
+function ack(key){appState.outbox=appState.outbox.filter(x=>x.key!==key);inFlight.delete(key);}
+function scheduleSend(){if(!isWebxdc||replaying||sendTimer||sending)return;const waiting=appState.outbox.some(x=>!inFlight.has(x.key));if(!waiting){syncStatus();return;}const delay=Math.max(0,lastSend+(Number(window.webxdc.sendUpdateInterval)||10000)-Date.now());sendTimer=setTimeout(()=>{sendTimer=null;flushOutbox();},delay);}
+async function flushOutbox(){
+ if(sending||replaying)return;const first=appState.outbox.find(x=>!inFlight.has(x.key));if(!first)return;
+ sending=true;let items=[first],update=first.update;
+ if(Array.isArray(update.payload)&&update.payload[0]==='p'){
+  const id=update.payload[1];items=appState.outbox.filter(x=>!inFlight.has(x.key)&&Array.isArray(x.update.payload)&&x.update.payload[0]==='p'&&x.update.payload[1]===id).slice(0,100);
+  if(items.length>1)update={payload:['b',id,items.map(x=>x.update.payload.slice(2))]};
+ }
+ // Results wait until all local fixes have been passed to the host first.
+ if(update.payload.type==='complete'){const st=stateFor(update.payload.puzzleId);update={...update,payload:{...update.payload,hints:Object.keys(st.hints).length}};update.info=resultInfo(update.payload);}
+ const bytes=new TextEncoder().encode(JSON.stringify(update)).length;
+ if(bytes>(Number(window.webxdc.sendUpdateMaxSize)||128000)){sending=false;toast('送信上限を超えました。配信をやり直してください');return;}
+ for(const item of items)inFlight.add(item.key);
+ lastSend=Date.now();
+ try{await window.webxdc.sendUpdate(update,'');}catch(e){for(const item of items)inFlight.delete(item.key);toast('送信できません。同期待ちの内容は保存して再試行します');}
+ sending=false;saveLocal();scheduleSend();
+}
+function applyFix(id,index,hint){
+ if(!validId(id)||!Number.isInteger(index)||index<0||index>=100||!(hint===0||typeof hint==='string'&&/^[A-Za-z0-9_-]{12}$/.test(hint)))return false;
+ const def=appState.puzzles.find(p=>p.id===id);if(def&&index>=def.rows*def.cols)return false;
+ const st=stateFor(id);st.fixed[index]=true;if(hint)st.hints[hint]=index;
+ if(id===appState.currentPuzzleId&&!appState.building){const piece=appState.pieces[index];if(piece)fixVisual(piece);updateProgress();checkComplete();}
+ return true;
+}
+function fixVisual(p){fullPiece(p);p.placed=true;p.inTray=false;p.el.classList.add('placed');p.el.classList.remove('dragging');p.el.style.left=p.correctX+'px';p.el.style.top=p.correctY+'px';p.el.style.zIndex=5;}
+function lockPiece(index,usedHint){
+ const id=appState.currentPuzzleId,p=appState.pieces[index];if(!p||p.placed||!id)return;
+ appState.moves++;document.getElementById('hudMoves').textContent=appState.moves;
+ const h=usedHint?token():0;
+ if(usedHint)appState.localHints=(appState.localHints||0)+1;
+ // Save the outgoing event before rendering completion, including on the last fix.
+ const event={payload:['p',id,index,h]};const key=placementKey(id,index,h);
+ if(isWebxdc&&!appState.outbox.some(x=>x.key===key))appState.outbox.push({key,update:event});
+ applyFix(id,index,h);captureProgress();saveLocal();scheduleSend();
+}
+function captureProgress(){
+ if(!appState.currentPuzzleId||appState.building||!appState.pieces.length)return;
+ const width=document.getElementById('playField').getBoundingClientRect().width;if(!width)return;
+ const id=appState.currentPuzzleId;appState.lastPuzzleId=id;
+ appState.progress[id]={timer:appState.timer,moves:appState.moves,localHints:appState.localHints||0,result:appState.completedResult||null,trayPage:appState.trayPage||0,trayOrder:appState.trayOrder||[],positions:appState.pieces.map(p=>({x:parseFloat(p.el.style.left)/width,y:(parseFloat(p.el.style.top)-(p.inTray?appState.trayTop:appState.boardTop))/width,inTray:p.inTray})),preview:!document.getElementById('previewFloat').classList.contains('hidden')};
+ saveLocal();
+}
+function timeString(seconds){return String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');}
+function paintStats(){document.getElementById('hudTime').textContent=timeString(appState.timer);document.getElementById('hudMoves').textContent=appState.moves;document.getElementById('hudHints').textContent=appState.currentPuzzleId?hintCount(appState.currentPuzzleId):0;}
+startTimer=function(){stopTimer();appState.timerInt=setInterval(()=>{appState.timer++;paintStats();if(appState.timer%5===0)captureProgress();},1000);};
+const oldUpdateProgress=updateProgress;
+updateProgress=function(){oldUpdateProgress();if(document.getElementById('hudHints'))document.getElementById('hudHints').textContent=appState.currentPuzzleId?hintCount(appState.currentPuzzleId):0;};
+function restoreProgress(def){
+ const saved=appState.progress[def.id]||{},st=stateFor(def.id),w=document.getElementById('playField').getBoundingClientRect().width;
+ clearSelection();appState.trayPage=Number.isInteger(saved.trayPage)?saved.trayPage:0;appState.trayOrder=Array.isArray(saved.trayOrder)?saved.trayOrder:appState.pieces.map((p,i)=>i);
+ appState.timer=Number.isFinite(saved.timer)?Math.max(0,saved.timer):0;appState.moves=Number.isFinite(saved.moves)?Math.max(0,saved.moves):0;appState.localHints=Number.isFinite(saved.localHints)?saved.localHints:0;appState.completedResult=validResult(saved.result)?saved.result:null;
+ appState.pieces.forEach((p,i)=>{if(st.fixed[i]){fixVisual(p);return;}const pos=saved.positions?.[i];if(pos&&Number.isFinite(pos.x)&&Number.isFinite(pos.y)){p.inTray=!!pos.inTray;p.el.style.left=Math.max(0,Math.min(w-p.el.offsetWidth,pos.x*w))+'px';p.el.style.top=Math.max(0,(p.inTray?appState.trayTop:appState.boardTop)+pos.y*w)+'px';}});
+ if(saved.preview===false)document.getElementById('previewFloat').classList.add('hidden');
+ paintStats();updateProgress();startTimer();checkComplete();appState.lastPuzzleId=def.id;
+}
+function validResult(p){return !!p&&p.type==='complete'&&validId(p.puzzleId)&&Number.isFinite(p.time)&&p.time>=0&&Number.isFinite(p.moves)&&p.moves>=0&&(p.hints===undefined||Number.isInteger(p.hints)&&p.hints>=0);}
+recordComplete=function(pay){const existing=appState.completes.findIndex(x=>x.id&&x.id===pay.id||!x.id&&!pay.id&&x.puzzleId===pay.puzzleId&&x.addr===pay.addr&&x.ts===pay.ts);if(existing<0)appState.completes.unshift(pay);else appState.completes[existing]={...appState.completes[existing],...pay};saveLocal();renderCompletes();};
+checkComplete=function(){
+ if(!appState.pieces.length||!appState.pieces.every(p=>p.placed))return;
+ stopTimer();if(appState.completedResult){appState.completedResult.hints=hintCount(appState.currentPuzzleId);recordComplete(appState.completedResult);return;}
+ const pay={id:'c-'+appState.currentPuzzleId+'-'+window.webxdc.selfAddr,type:'complete',coop:true,puzzleId:appState.currentPuzzleId,time:appState.timer,timeStr:timeString(appState.timer),moves:appState.moves,hints:hintCount(appState.currentPuzzleId),localHints:appState.localHints||0,name:window.webxdc.selfName||'あなた',addr:window.webxdc.selfAddr,ts:Date.now()};
+ appState.completedResult=pay;recordComplete(pay);captureProgress();if(!replaying){launchConfetti();toast('みんなで完成！「完成をシェア」でヒント数も投稿できます');}
+};
+function resultInfo(p){return ('協力完成 '+p.timeStr+' ヒント'+p.hints+'回 '+p.name).replace(/[\r\n]/g,' ').slice(0,50);}
+publishResult=function(pay){
+ if(!isWebxdc){toast('ブラウザ単体ではチャットへ送信できません。完成結果はこの端末に保存しました');return;}
+ const key='c:'+pay.id;if(appState.distributed[key]||appState.outbox.some(x=>x.key===key)){toast('この結果は投稿済み、または同期待ちです');return;}
+ pay.hints=hintCount(pay.puzzleId);recordComplete(pay);enqueue(key,{payload:{...pay},info:resultInfo(pay),summary:'協力完成 ヒント'+pay.hints+'回'});toast('結果を送信待ちに追加しました');
+};
+publishPuzzle=function(p){if(!isWebxdc){toast('ブラウザ単体では配信できません。Delta Chatで開いてください');return;}const def={type:'new-puzzle',id:p.id,rows:p.rows,cols:p.cols,imageDataUrl:p.imageDataUrl,creator:p.creator,creatorAddr:p.creatorAddr,ts:p.ts,coop:true};enqueue('d:'+p.id,{payload:def,info:'協力パズル '+p.rows+'×'+p.cols});toast('同じIDのパズルを送信待ちに追加しました');};
+function clearGallery(){if(!confirm('一覧と完成ログをこの端末で非表示にします。協力の進行・送信待ちは残り、相手の画面は変わりません。よろしいですか？'))return;captureProgress();for(const p of appState.puzzles)appState.hiddenPuzzles[p.id]=true;for(const p of appState.completes)appState.hiddenResults[p.id||p.puzzleId+':'+p.ts]=true;saveLocal();renderGallery();renderCompletes();toast('非表示にしました。「非表示を戻す」で戻せます');}
+function restoreGallery(){appState.hiddenPuzzles=map();appState.hiddenResults=map();saveLocal();renderGallery();renderCompletes();}
+renderGallery=function(){
+ const l=document.getElementById('galleryList'),empty=document.getElementById('galleryEmpty');l.replaceChildren();const visible=appState.puzzles.filter(p=>!own(appState.hiddenPuzzles,p.id));empty.style.display=visible.length?'none':'block';
+ for(const p of visible){const d=document.createElement('div');d.className='g-card';const img=document.createElement('img');img.className='g-thumb';img.src=p.imageDataUrl;img.alt='パズル画像';const meta=document.createElement('div');const title=document.createElement('b');title.textContent=p.rows+'×'+p.cols+' '+stateFor(p.id).fixed.filter(Boolean).length+'/'+p.rows*p.cols+'枚';const author=document.createElement('div');author.textContent=String(p.creator||'');const actions=document.createElement('div');actions.className='g-actions';actions.style.flexWrap='wrap';
+  for(const [label,fn] of [['▶ 続きから',()=>buildPuzzle(p).catch(()=>toast('画像を読み込めません'))],['↗ 同じIDで再配信',()=>publishPuzzle(p)],['新しく遊ぶ',()=>{if(!confirm('同じ写真で新しい協力パズルを作成・配信します。元の進行は残ります。'))return;const copy={...p,id:newPuzzleId(),creator:window.webxdc.selfName,creatorAddr:window.webxdc.selfAddr,ts:Date.now()};appState.puzzles.unshift(copy);publishPuzzle(copy);saveLocal();renderGallery();buildPuzzle(copy).catch(()=>toast('画像を読み込めません'));}]]){const btn=document.createElement('button');btn.className='mini-btn';btn.textContent=label;btn.onclick=fn;actions.append(btn);}
+  const status=document.createElement('div');status.style.cssText='font-size:10px;color:#777';status.textContent=(appState.outbox.some(x=>x.key==='d:'+p.id)?'配信待ち':appState.distributed['d:'+p.id]?'配信済み':'受信済み')+' / '+p.id;meta.append(title,author,actions,status);d.append(img,meta);l.append(d);
+ }
+};
+renderCompletes=function(){const list=document.getElementById('completeLog');list.replaceChildren();const items=appState.completes.filter(x=>!own(appState.hiddenResults,x.id||x.puzzleId+':'+x.ts)).slice(0,20);document.getElementById('completeEmpty').style.display=items.length?'none':'block';for(const x of items){const d=document.createElement('div');d.style.cssText='background:#F8F1E9;border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-size:12px';const hints=x.coop?Math.max(x.hints||0,hintCount(x.puzzleId)):x.hints;d.textContent=(x.coop?'🤝 ':'🏆 ')+String(x.name||'')+' '+String(x.timeStr||'')+(hints===undefined?'':' / チームヒント '+hints+'回')+(x.coop?' / 自分 '+(x.localHints||0)+'回':'');list.append(d);}};
+handleUpdate=function(u){
+ const p=u?.payload;if(!p)return;
+ if(Array.isArray(p)){
+  const [type,id]=p;if(!validId(id))return;
+  const fixes=type==='p'?[[p[2],p[3]]]:type==='b'&&Array.isArray(p[2])?p[2].slice(0,100):[];
+  for(const fix of fixes)if(Array.isArray(fix)&&applyFix(id,fix[0],fix[1]))ack(placementKey(id,fix[0],fix[1]));
+  saveLocal();renderGallery();renderCompletes();scheduleSend();return;
+ }
+ if(p.type==='new-puzzle'&&validPuzzle(p)&&validId(p.id)){
+  const existing=appState.puzzles.find(x=>x.id===p.id);
+  if(existing&&(existing.rows!==p.rows||existing.cols!==p.cols||existing.imageDataUrl!==p.imageDataUrl))return;
+  if(!existing){const {thumb,type,...def}=p;appState.puzzles.unshift(def);}
+  const st=stateFor(p.id);st.fixed=st.fixed.slice(0,p.rows*p.cols);for(const k of Object.keys(st.hints))if(st.hints[k]>=p.rows*p.cols)delete st.hints[k];
+  appState.distributed['d:'+p.id]=true;ack('d:'+p.id);saveLocal();renderGallery();scheduleSend();
+ }else if(validResult(p)){
+  recordComplete(p);appState.distributed['c:'+p.id]=true;ack('c:'+p.id);saveLocal();scheduleSend();
+ }
+};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)captureProgress();else scheduleSend();});window.addEventListener('pagehide',captureProgress);
+document.getElementById('btnClearGallery').addEventListener('click',clearGallery);
+document.getElementById('btnRestoreGallery').addEventListener('click',restoreGallery);
+for(const id of ['btnShuffle','btnOrganize','btnToTray','btnPreviewToggle'])document.getElementById(id).addEventListener('click',captureProgress);
+async function initializeCoop(){
+ loadLocal();renderGallery();renderCompletes();updateCounts();
+ try{if(isWebxdc)await window.webxdc.setUpdateListener(handleUpdate,0);}catch(e){toast('受信を開始できません。開き直してください');}
+ replaying=false;const p=appState.puzzles.find(x=>x.id===appState.lastPuzzleId&&!own(appState.hiddenPuzzles,x.id));if(p)await buildPuzzle(p).catch(()=>toast('保存した画像を読み込めません'));saveLocal();scheduleSend();
+}
+// Compact, paged thumbnails. The full piece is restored only while dragging or on the board.
+function trayPageSize(){return document.getElementById('playField').getBoundingClientRect().width>=450?8:6;}
+function trayIndices(){const all=appState.pieces.map((p,i)=>i);const order=Array.isArray(appState.trayOrder)?appState.trayOrder:[];const seen=new Set();return [...order,...all].filter(i=>Number.isInteger(i)&&i>=0&&i<all.length&&!seen.has(i)&&seen.add(i)).filter(i=>!appState.pieces[i].placed&&appState.pieces[i].inTray);}
+function fullPiece(p){p.el.style.width=p.fullW+'px';p.el.style.height=p.fullH+'px';p.el.classList.remove('tray-thumb');p.el.classList.remove('hidden');}
+function clearSelection(){appState.selectedPiece=null;for(const p of appState.pieces){p.el.classList.remove('selected');p.el.setAttribute('aria-pressed','false');}document.getElementById('trayHelp').textContent='ピースをタップ → ボードをタップ。ドラッグでも移動できます。';}
+function selectPiece(index){const p=appState.pieces[index];if(!p||p.placed)return;if(appState.selectedPiece===index){clearSelection();return;}clearSelection();appState.selectedPiece=index;p.el.classList.add('selected');p.el.setAttribute('aria-pressed','true');document.getElementById('trayHelp').textContent='選択中：ボードの置きたい場所をタップしてください。もう一度押すと解除。';}
+function layoutTray(){
+ if(appState.building||!appState.pieces.length)return;
+ const tray=document.getElementById('trayWrap'),slots=document.getElementById('traySlots'),pf=document.getElementById('playField'),size=trayPageSize(),ids=trayIndices();
+ const pages=Math.max(1,Math.ceil(ids.length/size));appState.trayPage=Math.max(0,Math.min(pages-1,appState.trayPage||0));
+ const visible=ids.slice(appState.trayPage*size,(appState.trayPage+1)*size),visibleSet=new Set(visible);
+ if(appState.selectedPiece!=null&&(!appState.pieces[appState.selectedPiece]||appState.pieces[appState.selectedPiece].placed||(appState.pieces[appState.selectedPiece].inTray&&!visibleSet.has(appState.selectedPiece))))clearSelection();
+ tray.style.minHeight='0px';slots.style.gridTemplateColumns='repeat('+(size/2)+',1fr)';
+ if(slots.children.length!==size){slots.replaceChildren(...Array.from({length:size},()=>{const slot=document.createElement('div');slot.className='tray-slot';return slot;}));}
+ document.getElementById('trayPageLabel').textContent=(appState.trayPage+1)+' / '+pages;
+ document.getElementById('btnTrayPrev').disabled=appState.trayPage===0;document.getElementById('btnTrayNext').disabled=appState.trayPage>=pages-1;
+ document.getElementById('trayCount').textContent=ids.length;
+ const rect=pf.getBoundingClientRect();appState.trayTop=tray.getBoundingClientRect().top-rect.top;
+ appState.pieces.forEach((p,i)=>{
+  if(p.el.classList.contains('dragging'))return;
+  p.el.tabIndex=p.placed?-1:0;
+  if(p.placed){fullPiece(p);p.el.style.left=p.correctX+'px';p.el.style.top=p.correctY+'px';return;}
+  if(!p.inTray){fullPiece(p);return;}
+  p.el.classList.toggle('hidden',!visibleSet.has(i));if(!visibleSet.has(i))return;
+  const cell=slots.children[visible.indexOf(i)].getBoundingClientRect(),scale=Math.min(3,(cell.width-12)/p.fullW,(cell.height-10)/p.fullH);
+  const w=p.fullW*scale,h=p.fullH*scale;p.el.classList.add('tray-thumb');p.el.style.width=w+'px';p.el.style.height=h+'px';p.el.style.left=(cell.left-rect.left+(cell.width-w)/2)+'px';p.el.style.top=(cell.top-rect.top+(cell.height-h)/2)+'px';p.el.style.zIndex=20;
+ });
+ for(let i=0;i<size;i++){const slot=slots.children[i],index=visible[i];slot.classList.toggle('empty-slot',index==null);slot.setAttribute('role','button');slot.tabIndex=index==null?-1:0;slot.setAttribute('aria-label',index==null?'空き枠':'ピース '+(index+1)+'を選ぶ');slot.onclick=()=>{if(index!=null)selectPiece(index);};slot.onkeydown=e=>{if(index!=null&&(e.key==='Enter'||e.key===' ')){e.preventDefault();selectPiece(index);}};}
+}
+function setTrayPage(delta){dragCleanup();attachDrag();clearSelection();appState.trayPage=(appState.trayPage||0)+delta;layoutTray();captureProgress();}
+function arrangeTray(shuffle){dragCleanup();attachDrag();clearSelection();for(const p of appState.pieces)if(!p.placed)p.inTray=true;appState.trayOrder=appState.pieces.map((p,i)=>i);if(shuffle)for(let i=appState.trayOrder.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[appState.trayOrder[i],appState.trayOrder[j]]=[appState.trayOrder[j],appState.trayOrder[i]];}appState.trayPage=0;layoutTray();captureProgress();}
+function returnBoardPieces(){dragCleanup();attachDrag();clearSelection();for(const p of appState.pieces)if(!p.placed)p.inTray=true;appState.trayPage=0;layoutTray();captureProgress();}
+function placeSelected(e){
+ if(appState.selectedPiece==null)return;const index=appState.selectedPiece,p=appState.pieces[index];if(!p||p.placed){clearSelection();return;}
+ // A click generated by dropping a dragged piece is handled by the drag code already.
+ if(Date.now()<(appState.ignoreBoardClickUntil||0))return;
+ const br=document.getElementById('boardVisual').getBoundingClientRect();if(e.clientX<br.left||e.clientX>=br.right||e.clientY<br.top||e.clientY>=br.bottom)return;
+ const col=Math.floor((e.clientX-br.left)/appState.pieceW),row=Math.floor((e.clientY-br.top)/appState.pieceH);
+ if(row===p.r&&col===p.c){clearSelection();lockPiece(index,false);}else{appState.moves++;paintStats();toast('そこではないようです。別の場所をタップしてください');captureProgress();}
+}
+function attachDrag(){
+ let active=null,startX=0,startY=0,sx=0,sy=0,wasTray=false,moved=false,pointerId=null,ox=0,oy=0;
+ const field=document.getElementById('playField'),layer=document.getElementById('piecesLayer');
+ function release(){if(active&&pointerId!=null){try{if(active.el.hasPointerCapture(pointerId))active.el.releasePointerCapture(pointerId);}catch(e){}}pointerId=null;}
+ function down(e){const el=e.target.closest('.piece');if(!el||active||e.isPrimary===false||e.button>0)return;const p=appState.pieces.find(p=>p.el===el);if(!p||p.placed)return;active=p;pointerId=e.pointerId;startX=e.clientX;startY=e.clientY;sx=parseFloat(el.style.left);sy=parseFloat(el.style.top);wasTray=p.inTray;moved=false;const r=el.getBoundingClientRect();ox=e.clientX-r.left;oy=e.clientY-r.top;el.setPointerCapture?.(e.pointerId);e.preventDefault();}
+ function move(e){
+  if(!active||e.pointerId!==pointerId)return;if(active.placed){release();active=null;return;}
+  if(!moved&&Math.hypot(e.clientX-startX,e.clientY-startY)<6)return;
+  if(!moved){moved=true;clearSelection();fullPiece(active);active.el.classList.add('dragging');active.el.style.zIndex=9999;if(wasTray){ox=active.fullW/2;oy=active.fullH/2;}}
+  const br=field.getBoundingClientRect();active.el.style.left=Math.max(0,Math.min(br.width-active.fullW,e.clientX-br.left-ox))+'px';active.el.style.top=Math.max(0,Math.min(br.height-active.fullH,e.clientY-br.top-oy))+'px';e.preventDefault();
+ }
+ function up(e){
+  if(!active||e.pointerId!==pointerId)return;const p=active;release();active=null;if(p.placed)return;
+  if(!moved){selectPiece(appState.pieces.indexOf(p));return;}
+  appState.ignoreBoardClickUntil=Date.now()+250;p.el.classList.remove('dragging');const x=parseFloat(p.el.style.left),y=parseFloat(p.el.style.top),d=Math.hypot(x-p.correctX,y-p.correctY),threshold=Math.min(appState.pieceW,appState.pieceH)*.38;
+  if(d<threshold)lockPiece(appState.pieces.indexOf(p),false);else{appState.moves++;paintStats();p.inTray=e.clientY>=document.getElementById('trayWrap').getBoundingClientRect().top;p.el.style.zIndex=100;}
+  layoutTray();captureProgress();
+ }
+ function cancel(){if(!active)return;const p=active;release();active=null;p.el.classList.remove('dragging');if(!p.placed){p.inTray=wasTray;p.el.style.left=sx+'px';p.el.style.top=sy+'px';}layoutTray();}
+ function dbl(e){const el=e.target.closest('.piece'),p=appState.pieces.find(p=>p.el===el);if(!p||p.placed)return;p.inTray=true;clearSelection();layoutTray();captureProgress();}
+ function key(e){const el=e.target.closest('.piece'),index=appState.pieces.findIndex(p=>p.el===el);if(index<0)return;if(e.key==='Enter'||e.key===' '){e.preventDefault();selectPiece(index);}if(e.key==='Escape')clearSelection();}
+ layer.addEventListener('pointerdown',down);window.addEventListener('pointermove',move,{passive:false});window.addEventListener('pointerup',up);window.addEventListener('pointercancel',cancel);layer.addEventListener('dblclick',dbl);layer.addEventListener('keydown',key);
+ dragCleanup=()=>{cancel();layer.removeEventListener('pointerdown',down);window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',cancel);layer.removeEventListener('dblclick',dbl);layer.removeEventListener('keydown',key);};
+}
+document.getElementById('btnTrayPrev').onclick=()=>setTrayPage(-1);document.getElementById('btnTrayNext').onclick=()=>setTrayPage(1);document.getElementById('playField').addEventListener('click',placeSelected);
+
+
+window.coopReady=initializeCoop();
+
+</script>
+</body>
+</html>
+
